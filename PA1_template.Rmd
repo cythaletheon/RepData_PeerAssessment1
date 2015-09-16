@@ -1,25 +1,163 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
+author: Damon Grummet
+date: September 16, 2015
 output: 
   html_document:
     keep_md: true
 ---
 
+Welcome to my submission for the first assessment in Reproducible Research, September 2015.  
 
+First, some settings and library load commands to set up this document.  Normally this would not be visible in a report.
+```{r global_options, echo = TRUE, include = TRUE} 
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/',
+                      echo = TRUE, results = "show")
+```
+```{r load_packages, echo = TRUE, include = TRUE}
+#Load required packages - normally this would be hidden using echo = FALSE, include = FALSE.
+library(broman)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+```
 ## Loading and preprocessing the data
 
+The data has been provided for this project in a zipped archive called 'activity.zip' in the working 
+folder.  To import this data, it needs to be unzipped and read by the csv reader package:
+
+```{r}
+# read raw data from zipped file
+rawactivitydata <- read.csv(unzip('activity.zip'))
+
+```
+
+No data cleansing will be done at this stage, as later questions in this project compare the uncleansed results below with imputed data.  Hence, there are a number of NA values present in the 'steps' column, as can be seen in the summary:
+```{r}
+summary(rawactivitydata)
+```
 
 
 ## What is mean total number of steps taken per day?
+```{r}
+totalstepsperday <- aggregate(rawactivitydata$steps, list(rawactivitydata$date), sum)
+colnames(totalstepsperday) <- c('Date','Sum')
+hist(totalstepsperday$Sum, main = "Histogram of total steps in a day (raw data)",
+     xlab = "Sum of steps", ylab = "Frequency in dataset")
+
+medianStepsPerDay <- as.numeric(median(totalstepsperday$Sum, na.rm=TRUE))
+meanStepsPerDay <- as.numeric(mean(totalstepsperday$Sum, na.rm=TRUE))
+```
+
+In the raw data, the median number of steps per day is `r myround(medianStepsPerDay,1)`.
+
+The average (mean) total steps in a day is `r myround(meanStepsPerDay,4)`.
 
 
 
 ## What is the average daily activity pattern?
+```{r}
+# average daily activity pattern. group by interval, show a representative day.
+repDay <- rawactivitydata %>%
+  group_by (interval) %>%
+  summarize( meanSteps = mean(steps, na.rm=TRUE))
 
+#average daily activity
+plot(repDay$interval, repDay$meanSteps, type="l", main = "Time Series of an 'average' day", xlab="Time of Day", ylab="Average Steps")
+```
+(please note, the time intervals are displayed in a pseudo military time format {hhmm} where leading zeros are missing.)
+
+There is a marked peak in the morning, with regular activity during the daylight hours.  Activity reduces in the evening and predictably reaches a minimum in the later parts of the night.
+
+```{r}
+#find the interval where the maximum number of average steps occurs:
+mostactiveinterval <- as.numeric(repDay[which.max(repDay$meanSteps),1]$interval)
+```
+
+The most active period in the average day is `r mostactiveinterval`, reaching around `r myround(max(repDay$meanSteps),2)` steps per day.
 
 
 ## Imputing missing values
+```{r}
+countmissingsteps <- sum(is.na(rawactivitydata$steps))
+```
 
+The raw data contains `r countmissingsteps` rows where the steps value is NA.
+
+The following code uses the representative day table (repDay) generated above, to fill in the missing values in the raw data.  This is a very rough way to impute missing data to produce a working dataset for further analysis.  Where there is a missing value, the average value for that interval will be inserted.
+
+```{r}
+#create a table with the meanSteps from the representative day appended to the raw data,
+# making use of vector recycling for the shorter repDay vector
+tempdata <- cbind(rawactivitydata,repDay$meanSteps)
+
+# now generate imputed data using replacement - if the steps value is NA, use the meanSteps
+# for the day as previously worked out.
+imputed <- tempdata %>%
+  mutate(steps = ifelse(is.na(steps), floor(repDay$meanSteps),steps)) %>%
+  select(steps,date,interval)
+
+#however mean of total steps per day is: get total steps per day, then find mean:
+imputedtotalstepsperday <- aggregate(imputed$steps, list(imputed$date), sum)
+colnames(imputedtotalstepsperday) <- c('Date','Sum')
+```
+
+Now that the missing data has been replaced with approximations based on available data, we can generate a histogram to see how the data frequency now looks:
+```{r}
+# histogram of steps, mean and median values.
+hist(imputedtotalstepsperday$Sum, main = "Histogram of total steps in a day (imputed data)",
+     xlab = "Sum of steps", ylab = "Frequency in dataset")
+```
+
+As can be seen, the histogram on the imputed data looks very close to the original histogram of the raw data.
+
+The mean and median can now be computed to test the variance of the imputed data from the raw data.
+```{r}
+imputedmedianStepsPerDay <- median(imputedtotalstepsperday$Sum)
+imputedmeanStepsPerDay <- mean(imputedtotalstepsperday$Sum)
+```
+
+The median for the imputed data set is `r myround(imputedmedianStepsPerDay,1)` and the mean is `r myround(imputedmeanStepsPerDay,4)`.  
+
+The method used here for imputing the missing data has resulted in a slight skewing of the data, as can be seen in the following comparison:
+```{r xtable, results="asis"}
+#note, the "asis" option is needed to make the kable output display in a pretty format
+
+comparedata<- data.frame(datasource=c('Raw','Imputed'), 
+                         mean = c(meanStepsPerDay,imputedmeanStepsPerDay), 
+                         median = c(medianStepsPerDay,imputedmedianStepsPerDay))
+xt <- kable(comparedata, format="markdown")
+print(xt, "html", include.rownames = FALSE)
+```
+
+The median value in particular has dropped, though only by `r myround(100 - (imputedmedianStepsPerDay / medianStepsPerDay * 100))`%.  Given such small differences, we can assume for the purposes of this exercise that the imputed data is a very good estimate of the truth.
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Firstly, we need to factorise the imputed data into two groups - weekdays and weekends.  Using the function 'weekdays()' in a dplyr mutate cascade construct, then grouping by the factor and interval will allow generation of a table of the mean steps per interval for weekdays and weekends.
+```{r}
+# add weekday flag, group and summarize the mean
+imputedwkday <- imputed %>%
+  mutate(weekdayfactor = ifelse(((weekdays(as.Date(date, format="%Y-%m-%d"))=="Saturday")|
+                               (weekdays(as.Date(date, format="%Y-%m-%d"))=="Sunday")),
+                            'weekend','weekday')) %>%
+  group_by (weekdayfactor,interval) %>%
+  summarize( meanSteps = mean(steps))
+```
+
+Now, the result can be plotted:
+
+```{r}
+weekvsweekend <- qplot(interval, meanSteps, data=imputedwkday, 
+                       facets = weekdayfactor ~ ., geom = c('line'),
+                       main = "Time series plot of average steps taken in each interval, 
+comparing weekdays to weekends",
+                       xlab = "Interval",
+                       ylab = "Average number of steps")
+print(weekvsweekend)
+```
+
+This graph suggests there is a difference in walking behaviour between weekdays and weekends. Weekdays are showing greatest walking activity in the morning around 8:30am, whereas the weekends have walking spread out more evenly during the day.  
+
+This suggests further questions for the gathering of data: Does the subject go for morning jogs before work?  Does the subject do more house work or shopping on weekends?  We may never know!
