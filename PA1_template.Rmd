@@ -1,13 +1,17 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-author: Damon Grummet
-date: September 16, 2015
-output: 
+title: 'Reproducible Research: Peer Assessment 1'
+author: "Damon Grummet"
+date: "September 2015"
+output:
   html_document:
-    keep_md: true
+    keep_md: yes
+  pdf_document: default
 ---
 
-Welcome to my submission for the first assessment in Reproducible Research, September 2015.  
+## Introduction
+Welcome to my submission for the first assessment in [Reproducible Research](https://www.coursera.org/course/repdata), September 2015.  
+
+### R markdown Setup
 
 First, some settings and library load commands to set up this document.  Normally this would not be visible in a report.
 ```{r global_options, echo = TRUE, include = TRUE} 
@@ -21,10 +25,43 @@ library(dplyr)
 library(ggplot2)
 library(knitr)
 ```
+
+## Abstract
+(Quoted from the README.md file provided as part of the assignment.)
+
+"It is now possible to collect a large amount of data about personal
+movement using activity monitoring devices such as a
+[Fitbit](http://www.fitbit.com), [Nike
+Fuelband](http://www.nike.com/us/en_us/c/nikeplus-fuelband), or
+[Jawbone Up](https://jawbone.com/up). These type of devices are part of
+the "quantified self" movement -- a group of enthusiasts who take
+measurements about themselves regularly to improve their health, to
+find patterns in their behavior, or because they are tech geeks. But
+these data remain under-utilized both because the raw data are hard to
+obtain and there is a lack of statistical methods and software for
+processing and interpreting the data.
+
+This assignment makes use of data from a personal activity monitoring
+device. This device collects data at 5 minute intervals through out the
+day. The data consists of two months of data from an anonymous
+individual collected during the months of October and November, 2012
+and include the number of steps taken in 5 minute intervals each day."
+
+
+
 ## Loading and preprocessing the data
 
 The data has been provided for this project in a zipped archive called 'activity.zip' in the working 
-folder.  To import this data, it needs to be unzipped and read by the csv reader package:
+folder.  
+
+The dataset consists of 17,568 observations of 3 variables:
+* **steps**: The number of steps taken during the interval, missing values recorded as NA.
+* **date**: The date the measurement was recorded, in YYYY-MM-DD format.
+* **interval**: A time tag in hhmm format (no leading zeros) indicating the specific 5 minute interval
+
+The file 'activity.csv' within the archive is in comma separated values format (csv.)
+
+To import this data, it needs to be unzipped and read by the csv reader package:
 
 ```{r}
 # read raw data from zipped file
@@ -37,6 +74,9 @@ No data cleansing will be done at this stage, as later questions in this project
 summary(rawactivitydata)
 ```
 
+# The Questions
+
+The assignment has been broken up into a set of questions to be answered.  The questions and my attempts to provide answers follow.
 
 ## What is mean total number of steps taken per day?
 ```{r}
@@ -46,12 +86,14 @@ hist(totalstepsperday$Sum, main = "Histogram of total steps in a day (raw data)"
      xlab = "Sum of steps", ylab = "Frequency in dataset")
 
 medianStepsPerDay <- as.numeric(median(totalstepsperday$Sum, na.rm=TRUE))
+medianStepsPerDay
 meanStepsPerDay <- as.numeric(mean(totalstepsperday$Sum, na.rm=TRUE))
+meanStepsPerDay
 ```
 
-In the raw data, the median number of steps per day is `r myround(medianStepsPerDay,1)`.
+In the raw data, the median number of steps per day is `r as.integer(medianStepsPerDay)`.
 
-The average (mean) total steps in a day is `r myround(meanStepsPerDay,4)`.
+The average (mean) total steps in a day is `r myround(meanStepsPerDay,2)`.
 
 
 
@@ -72,6 +114,7 @@ There is a marked peak in the morning, with regular activity during the daylight
 ```{r}
 #find the interval where the maximum number of average steps occurs:
 mostactiveinterval <- as.numeric(repDay[which.max(repDay$meanSteps),1]$interval)
+mostactiveinterval
 ```
 
 The most active period in the average day is `r mostactiveinterval`, reaching around `r myround(max(repDay$meanSteps),2)` steps per day.
@@ -80,6 +123,7 @@ The most active period in the average day is `r mostactiveinterval`, reaching ar
 ## Imputing missing values
 ```{r}
 countmissingsteps <- sum(is.na(rawactivitydata$steps))
+countmissingsteps
 ```
 
 The raw data contains `r countmissingsteps` rows where the steps value is NA.
@@ -114,7 +158,9 @@ As can be seen, the histogram on the imputed data looks very close to the origin
 The mean and median can now be computed to test the variance of the imputed data from the raw data.
 ```{r}
 imputedmedianStepsPerDay <- median(imputedtotalstepsperday$Sum)
+imputedmedianStepsPerDay
 imputedmeanStepsPerDay <- mean(imputedtotalstepsperday$Sum)
+imputedmeanStepsPerDay
 ```
 
 The median for the imputed data set is `r myround(imputedmedianStepsPerDay,1)` and the mean is `r myround(imputedmeanStepsPerDay,4)`.  
@@ -160,4 +206,6 @@ print(weekvsweekend)
 
 This graph suggests there is a difference in walking behaviour between weekdays and weekends. Weekdays are showing greatest walking activity in the morning around 8:30am, whereas the weekends have walking spread out more evenly during the day.  
 
-This suggests further questions for the gathering of data: Does the subject go for morning jogs before work?  Does the subject do more house work or shopping on weekends?  We may never know!
+## Conclusion
+
+As can be seen from the results above, there appears to be a level of repetition in the subjects daily routine, more prevalent during weekdays but still noticable on weekends.  The greatest consistent activity appears to occur in the morning, with the maximum pace achieved around 8:35am daily.  It can be surmised that the bus to work tends to get the drop on the subject more often than would be appreciated. Furthermore, given the frequency of spikes of movement, and the general consistent above zero stepcount during the day, the subject can be inferred to be engaged in an occupation that requires consistent low intensity walking, such as would be common in the role of school teacher, lecturer, shop attendant, chef or footwear quality assurer.  
